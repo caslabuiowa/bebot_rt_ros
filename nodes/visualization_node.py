@@ -14,7 +14,7 @@ from nav_msgs.msg import Path
 import rospy
 from visualization_msgs.msg import Marker, MarkerArray
 
-from bebot_rt_ros.msg import BernsteinTrajectory
+from bebot_rt_ros.msg import BernsteinTrajectory, BernsteinTrajectoryArray
 from polynomial.bernstein import Bernstein
 
 
@@ -23,8 +23,11 @@ class Visualization:
         rospy.init_node('visualizer', anonymous=True)
 
         self.traj_sub = rospy.Subscriber('trajectory', BernsteinTrajectory, self.traj_cb, queue_size=10)
+        self.traj_guess_sub = rospy.Subscriber('jfs_guess', BernsteinTrajectoryArray, self.traj_guess_cb,
+                                               queue_size=10)
         self.path_pub = rospy.Publisher('traj_path', Path, queue_size=10)
         self.traj_pub = rospy.Publisher('trajectory_viz', MarkerArray, queue_size=10)
+        self.traj_array_pub = rospy.Publisher('traj_array_viz', MarkerArray, queue_size=10)
         self.obstacle_pub = rospy.Publisher('obstacles', Marker, queue_size=10)
 
         self.obstacles = obstacles
@@ -66,40 +69,24 @@ class Visualization:
 
         # self.path_pub.publish(path)
 
+    def traj_guess_cb(self, data):
+        traj_list = []
+        for traj_msg in data.trajectories:
+            cpts = []
+            for pt in traj_msg.cpts:
+                cpts.append([pt.x, pt.y])
+            cpts = np.array(cpts, dtype=float).T
+            traj = Bernstein(cpts, traj_msg.t0, traj_msg.tf)
+            traj_list.append(traj)
+
+        self.show_trajectory_guesses(traj_list)
+
     def show_trajectory(self, trajectory):
         marker_array = MarkerArray()
         marker_list = []
 
         pts = trajectory(np.linspace(trajectory.t0, trajectory.tf, 101)).T
         marker_count = 0
-        # for pt in pts:
-        #     marker = Marker()
-        #     marker.header.frame_id = 'world'
-        #     marker.header.stamp = rospy.get_rostime()
-        #     marker.ns = f'trajectory_{self.traj_count}'
-        #     self.traj_count += 1
-        #     marker.type = Marker.SPHERE
-        #     marker.action = Marker.ADD
-        #     marker.scale.x = 0.1
-        #     marker.scale.y = 0.1 #1e-7
-        #     marker.scale.z = 0.1 # 1e-7
-
-        #     marker.id = marker_count
-        #     marker_count += 1
-        #     marker.pose.position.x = pt[0]
-        #     marker.pose.position.y = pt[1]
-        #     marker.pose.orientation.x = 0.0
-        #     marker.pose.orientation.y = 0.0
-        #     marker.pose.orientation.z = 0.0
-        #     marker.pose.orientation.w = 1.0
-
-        #     red, green, blue, alpha = plt.cm.jet(marker_count/len(pts))
-        #     marker.color.r = red
-        #     marker.color.g = green
-        #     marker.color.b = blue
-        #     marker.color.a = alpha # on't forget to set the alpha!
-
-        #     marker_list.append(marker)
         for i in range(len(pts)-1):
             marker = Marker()
             marker.header.frame_id = 'world'
@@ -117,10 +104,10 @@ class Visualization:
             # marker.pose.position.x = pts[i, 0]
             # marker.pose.position.y = pts[i, 1]
             # marker.pose.position.z = 0
-            # marker.pose.orientation.x = 0.0
-            # marker.pose.orientation.y = 0.0
-            # marker.pose.orientation.z = 0.0
-            # marker.pose.orientation.w = 1.0
+            marker.pose.orientation.x = 0.0
+            marker.pose.orientation.y = 0.0
+            marker.pose.orientation.z = 0.0
+            marker.pose.orientation.w = 1.0
             marker.points = [Point(pts[i, 0], pts[i, 1], 0), Point(pts[i+1, 0], pts[i+1, 1], 0)]
 
             red, green, blue, alpha = plt.cm.jet(marker_count/len(pts))
@@ -135,24 +122,59 @@ class Visualization:
 
         self.traj_pub.publish(marker_array)
 
-        # marker.pose.position.x = position[0]
-        # marker.pose.position.y = position[1]
-        # marker.pose.position.z = 0
-        # marker.pose.orientation.x = 0.0
-        # marker.pose.orientation.y = 0.0
-        # marker.pose.orientation.z = 0.0
-        # marker.pose.orientation.w = 1.0
-        # marker.scale.x = 2  # TODO: Define the obstacle size somewhere else so that it isn't hard coded here
-        # marker.scale.y = 2
-        # marker.scale.z = 2
-        # marker.color.a = 1.0 # on't forget to set the alpha!
-        # marker.color.r = 0.0
-        # marker.color.g = 0.0
-        # marker.color.b = 1.0
-        # marker.lifetime = rospy.Duration(10)
-        # # only if using a MESH_RESOURCE marker type:
-        # # marker.mesh_resource = "package://pr2_description/meshes/base_v0/base.dae";
-        # self.obstacle_pub.publish(marker)
+    def show_trajectory_guesses(self, trajectory_array):
+        # TODO: Should only need one function for plotting both the best traj and the traj guesses
+        rospy.logdebug('=================')
+        rospy.logdebug('Traj Guesses')
+        rospy.logdebug('=================')
+        for traj_idx, trajectory in enumerate(trajectory_array):
+            marker_array = MarkerArray()
+            marker_list = []
+
+
+            rospy.logdebug(f'{trajectory=}')
+
+            pts = trajectory(np.linspace(trajectory.t0, trajectory.tf, 101)).T
+            marker_count = 0
+
+            for i in range(len(pts)-1):
+                marker = Marker()
+                marker.header.frame_id = 'world'
+                marker.header.stamp = rospy.get_rostime()
+                marker.ns = f'traj_guess_{traj_idx}'
+                marker.type = Marker.LINE_STRIP
+                marker.action = Marker.ADD
+                marker.scale.x = 0.05
+                # marker.scale.y = 0.1  # 1e-7
+                # marker.scale.z = 0.1  # 1e-7
+
+                marker.id = marker_count
+                marker_count += 1
+                # The pose is simply a transformation from the frame id to whatever frame we want our markers to be in
+                # In this case, we don't want any transformation because we want them in the world frame
+                marker.pose.position.x = 0.0
+                marker.pose.position.y = 0.0
+                marker.pose.position.z = 0.0
+                marker.pose.orientation.x = 0.0
+                marker.pose.orientation.y = 0.0
+                marker.pose.orientation.z = 0.0
+                marker.pose.orientation.w = 1.0
+
+                marker.points = [Point(pts[i, 0], pts[i, 1], 0), Point(pts[i+1, 0], pts[i+1, 1], 0)]
+
+                # Set the color
+                red, green, blue, alpha = plt.cm.jet(marker_count/len(pts))
+                marker.color.r = 0  # red
+                marker.color.g = 1  # green
+                marker.color.b = 0  # blue
+                marker.color.a = alpha
+
+                marker_list.append(marker)
+
+            marker_array.markers = marker_list
+            self.traj_array_pub.publish(marker_array)
+            rospy.logdebug('--------------')
+
 
     def show_obstacle(self, position):
         marker = Marker()

@@ -12,7 +12,7 @@ import numpy as np
 from numpy.random import default_rng
 from scipy.stats.qmc import Sobol
 
-from bebot_rt_ros.msg import BernsteinTrajectory
+from bebot_rt_ros.msg import BernsteinTrajectory, BernsteinTrajectoryArray
 from geometry_msgs.msg import Point
 import rospy
 
@@ -68,7 +68,8 @@ def sobol_perturb(traj, goal, n=7, ndim=2, nchildren=8, std=1.0, rng_seed=None, 
     for i in range(nchildren):
         for j, pts in enumerate(values):
             cpts[j, 3:-1] = pts[:, i]
-            cpts[j, -1] = rng.normal(loc=goal[j], scale=std)
+            # cpts[j, -1] = rng.normal(loc=goal[j], scale=std)
+            cpts[j, -1] = cpts[j, -2]  # TODO: pick a better way to get the final cpt
         cpts_list.append(cpts.copy())
 
     rospy.logdebug('-----------')
@@ -179,6 +180,7 @@ class JellyfishController:
                  rng_seed=None):
         rospy.init_node('jellyfish_node')
         self.traj_pub = rospy.Publisher('trajectory', BernsteinTrajectory, queue_size=10)
+        self.traj_array_pub = rospy.Publisher('jfs_guess', BernsteinTrajectoryArray, queue_size=10)
 
         self.n = n
         self.ndim = ndim
@@ -239,6 +241,29 @@ class JellyfishController:
 
             # Publish traj here
             # Vehicle should monitor time so that it follows the new traj asap
+
+            costs, _ = zip(*trajs)
+            traj_idxs = np.argsort(costs)
+            traj_list = []
+            for i in traj_idxs[:10]:
+                traj = trajs[i][1]
+                bern_traj_msg = BernsteinTrajectory()
+                cpts = []
+                for pt in traj.cpts.T:
+                    tmp = Point()
+                    tmp.x = pt[0]
+                    tmp.y = pt[1]
+                    cpts.append(tmp)
+                bern_traj_msg.cpts = cpts
+                bern_traj_msg.t0 = t0
+                bern_traj_msg.tf = tf
+                # bern_traj_msg.header.stamp = rospy.get_rostime()
+                bern_traj_msg.header.frame_id = 'world'
+                traj_list.append(bern_traj_msg)
+
+            traj_array_msg = BernsteinTrajectoryArray()
+            traj_array_msg.trajectories = traj_list
+            self.traj_array_pub.publish(traj_array_msg)
 
             self.rate.sleep()
             # Need to skip rate.sleep if the search doesn't find a solution in time (well, does it matter since the
