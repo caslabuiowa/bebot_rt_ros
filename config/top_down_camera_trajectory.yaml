@@ -1,0 +1,25 @@
+rviz_cinematographer_camera_poses:
+  -
+    position:
+      x: 50.678085
+      y: 5.293843
+      z: 86.561966
+    orientation:
+      x: 0.000000
+      y: 0.000000
+      z: -0.707000
+      w: 0.707000
+    transition_duration: 2.500000
+    wait_duration: 130.000000
+  -
+    position:
+      x: 50.678085
+      y: 5.293843
+      z: 86.561966
+    orientation:
+      x: 0.000000
+      y: 0.000000
+      z: -0.707000
+      w: 0.707000
+    transition_duration: 2.500000
+    wait_duration: 0.000000
