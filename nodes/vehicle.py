@@ -23,7 +23,7 @@ class Vehicle:
         self.traj_sub = rospy.Subscriber('trajectory', BernsteinTrajectory, callback=self.traj_cb, queue_size=10)
         self.pose_pub = rospy.Publisher('pose', PoseStamped, queue_size=10)
 
-        self.rate = rospy.Rate(200)
+        self.rate = rospy.Rate(60)
 
         self.trajectory = None
         self.traj_buffer = []

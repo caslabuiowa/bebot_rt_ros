@@ -85,14 +85,14 @@ class Visualization:
         marker_array = MarkerArray()
         marker_list = []
 
-        pts = trajectory(np.linspace(trajectory.t0, trajectory.tf, 101)).T
+        pts = trajectory(np.linspace(trajectory.t0, trajectory.tf, 31)).T
         marker_count = 0
         for i in range(len(pts)-1):
             marker = Marker()
             marker.header.frame_id = 'world'
             marker.header.stamp = rospy.get_rostime()
             marker.ns = f'trajectory_{self.traj_count}'
-            self.traj_count += 1
+
             marker.type = Marker.LINE_STRIP
             marker.action = Marker.ADD
             marker.scale.x = 0.1
@@ -121,6 +121,8 @@ class Visualization:
         marker_array.markers = marker_list
 
         self.traj_pub.publish(marker_array)
+        self.traj_count += 1
+        self.traj_count = np.mod(self.traj_count, 30)
 
     def show_trajectory_guesses(self, trajectory_array):
         # TODO: Should only need one function for plotting both the best traj and the traj guesses
@@ -134,7 +136,7 @@ class Visualization:
 
             rospy.logdebug(f'{trajectory=}')
 
-            pts = trajectory(np.linspace(trajectory.t0, trajectory.tf, 101)).T
+            pts = trajectory(np.linspace(trajectory.t0, trajectory.tf, 31)).T
             marker_count = 0
 
             for i in range(len(pts)-1):
