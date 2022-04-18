@@ -11,17 +11,32 @@ import numpy as np
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Path
 import rospy
+from visualization_msgs.msg import Marker
 
 from bebot_rt_ros.msg import BernsteinTrajectory
 from polynomial.bernstein import Bernstein
 
 
 class Visualization:
-    def __init__(self):
+    def __init__(self, obstacles=[]):
         rospy.init_node('visualizer', anonymous=True)
 
         self.traj_sub = rospy.Subscriber('trajectory', BernsteinTrajectory, self.traj_cb, queue_size=10)
         self.path_pub = rospy.Publisher('traj_path', Path, queue_size=10)
+        self.obstacle_pub = rospy.Publisher('obstacles', Marker, queue_size=10)
+
+        self.obstacles = obstacles
+
+        self.rate = rospy.Rate(1)
+
+    def start(self):
+        while not rospy.is_shutdown():
+            self.marker_count = 0
+            for obs in obstacles:
+                self.show_marker(obs)
+                self.marker_count += 1
+
+            self.rate.sleep()
 
     def traj_cb(self, data):
         cpts = []
@@ -45,9 +60,44 @@ class Visualization:
 
         self.path_pub.publish(path)
 
-    def start(self):
-        rospy.spin()
+    def show_marker(self, position):
+        marker = Marker()
+        marker.header.frame_id = 'world'
+        marker.header.stamp = rospy.get_rostime()
+        marker.ns = 'obstacles'
+        marker.id = self.marker_count
+        marker.type = Marker.SPHERE
+        marker.action = Marker.ADD
+        marker.pose.position.x = position[0]
+        marker.pose.position.y = position[1]
+        marker.pose.position.z = 0
+        marker.pose.orientation.x = 0.0
+        marker.pose.orientation.y = 0.0
+        marker.pose.orientation.z = 0.0
+        marker.pose.orientation.w = 1.0
+        marker.scale.x = 2  # TODO: Define the obstacle size somewhere else so that it isn't hard coded here
+        marker.scale.y = 2
+        marker.scale.z = 2
+        marker.color.a = 1.0 # on't forget to set the alpha!
+        marker.color.r = 0.0
+        marker.color.g = 0.0
+        marker.color.b = 1.0
+        marker.lifetime = rospy.Duration(10)
+        # only if using a MESH_RESOURCE marker type:
+        # marker.mesh_resource = "package://pr2_description/meshes/base_v0/base.dae";
+        self.obstacle_pub.publish(marker)
+
 
 if __name__ == '__main__':
+    # TODO: Obstacles are copied and pasted here from jellyfish_controller_node.py. They should be removed from both
+    # files and either added in a config file (probably yaml) or should be "discovered" using a fake perception node
+    obstacles = [np.array([8, 0], dtype=float),  # Obstacle positions (m)
+                 np.array([20, 2], dtype=float),
+                 np.array([60, 1], dtype=float),
+                 np.array([40, 2], dtype=float),
+                 np.array([50, -3], dtype=float),
+                 np.array([80, -3], dtype=float),
+                 np.array([30, -1], dtype=float)]
+
     viz = Visualization()
     viz.start()

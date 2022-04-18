@@ -199,12 +199,13 @@ class JellyfishController:
         tf = 10
         dt = 1
         while not rospy.is_shutdown():
-            traj_guess = initial_guess(initial_position, initial_velocity, initial_acceleration, t0, tf,
-                                       self.n, self.ndim, goal)
+            cur_goal = project_goal(initial_position, self.safe_planning_radius, goal)
+            rospy.loginfo(f'Current goal: {cur_goal}')
 
-            cur_goal = project_goal(initial_position, safe_planning_radius, goal)
+            traj_guess = initial_guess(initial_position, initial_velocity, initial_acceleration, t0, tf,
+                                       self.n, self.ndim, cur_goal)
             best_traj, best_cost, trajs = jellyfish_search(traj_guess, cur_goal,
-                                                           obstacles=obstacles,
+                                                           obstacles=self.obstacles,
                                                            safe_dist=self.safe_dist,
                                                            vmax=self.vmax,
                                                            wmax=self.wmax,
@@ -230,8 +231,8 @@ class JellyfishController:
                 tmp.y = pt[1]
                 cpts.append(tmp)
             msg.cpts = cpts
-            msg.t0 = 0
-            msg.tf = 10
+            msg.t0 = t0
+            msg.tf = tf
             msg.header.stamp = rospy.get_rostime()
             msg.header.frame_id = 'world'
             self.traj_pub.publish(msg)
@@ -259,12 +260,12 @@ if __name__ == '__main__':
     wmax = np.pi/4
 
     obstacles = [np.array([8, 0], dtype=float),  # Obstacle positions (m)
-                  np.array([20, 2], dtype=float),
-                  np.array([60, 1], dtype=float),
-                  np.array([40, 2], dtype=float),
-                  np.array([50, -3], dtype=float),
-                  np.array([80, -3], dtype=float),
-                  np.array([30, -1], dtype=float)]
+                 np.array([20, 2], dtype=float),
+                 np.array([60, 1], dtype=float),
+                 np.array([40, 2], dtype=float),
+                 np.array([50, -3], dtype=float),
+                 np.array([80, -3], dtype=float),
+                 np.array([30, -1], dtype=float)]
 
     goal = np.array([100, 0], dtype=float)
     initial_position = np.array([0, 0], dtype=float)
