@@ -1,0 +1,10 @@
+name: bebot_rt
+channels:
+  - defaults
+dependencies:
+  - matplotlib
+  - numba
+  - numpy
+  - pandas
+  - scipy
+  - spyder
