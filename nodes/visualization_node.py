@@ -25,16 +25,18 @@ class Visualization:
         self.traj_sub = rospy.Subscriber('trajectory', BernsteinTrajectory, self.traj_cb, queue_size=10)
         self.traj_guess_sub = rospy.Subscriber('jfs_guess', BernsteinTrajectoryArray, self.traj_guess_cb,
                                                queue_size=10)
+        self.veh_pos_sub = rospy.Subscriber('pose', PoseStamped, self.veh_pos_cb, queue_size=10)
         self.path_pub = rospy.Publisher('traj_path', Path, queue_size=10)
         self.traj_pub = rospy.Publisher('trajectory_viz', MarkerArray, queue_size=10)
         self.traj_array_pub = rospy.Publisher('traj_array_viz', MarkerArray, queue_size=10)
         self.obstacle_pub = rospy.Publisher('obstacles', Marker, queue_size=10)
 
         self.obstacles = obstacles
+        self.veh_pos = None
 
         self.traj_count = 0
 
-        self.rate = rospy.Rate(1)
+        self.rate = rospy.Rate(10)
 
     def start(self):
         while not rospy.is_shutdown():
@@ -44,6 +46,9 @@ class Visualization:
                 self.marker_count += 1
 
             self.rate.sleep()
+
+    def veh_pos_cb(self, data):
+        self.veh_pos = np.array([data.pose.position.x, data.pose.position.y])
 
     def traj_cb(self, data):
         cpts = []
@@ -197,9 +202,14 @@ class Visualization:
         marker.scale.y = 2
         marker.scale.z = 2
         marker.color.a = 1.0 # on't forget to set the alpha!
-        marker.color.r = 0.0
-        marker.color.g = 0.0
-        marker.color.b = 1.0
+        if self.veh_pos is not None and np.linalg.norm(position - self.veh_pos) <= 10:
+            marker.color.r = 1.0
+            marker.color.g = 0.0
+            marker.color.b = 0.0
+        else:
+            marker.color.r = 0.0
+            marker.color.g = 0.0
+            marker.color.b = 1.0
         marker.lifetime = rospy.Duration(10)
         # only if using a MESH_RESOURCE marker type:
         # marker.mesh_resource = "package://pr2_description/meshes/base_v0/base.dae";
